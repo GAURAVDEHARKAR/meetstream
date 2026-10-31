@@ -1,0 +1,105 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Pillar 1)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Validation for User entity
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'updatedAt']) &&
+             data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256 &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1024));
+    }
+
+    // Validation for Meeting entity
+    function isValidMeeting(data) {
+      return data.keys().hasAll(['roomCode', 'hostId', 'status', 'createdAt']) &&
+             data.keys().hasOnly(['roomCode', 'hostId', 'hostName', 'status', 'createdAt', 'updatedAt']) &&
+             data.roomCode is string && data.roomCode.size() <= 64 &&
+             data.hostId is string && data.hostId.size() <= 128 &&
+             data.status in ['active', 'ended'] &&
+             (!('hostName' in data) || (data.hostName is string && data.hostName.size() <= 128));
+    }
+
+    // Validation for BreakoutSession entity
+    function isValidBreakout(data) {
+      return data.keys().hasAll(['mainRoomCode', 'hostId', 'status', 'createdAt']) &&
+             data.keys().hasOnly(['mainRoomCode', 'hostId', 'status', 'rooms', 'endsAt', 'broadcastMessage', 'createdAt', 'updatedAt']) &&
+             data.mainRoomCode is string && data.mainRoomCode.size() <= 64 &&
+             data.hostId is string && data.hostId.size() <= 128 &&
+             data.status in ['active', 'closing', 'ended'] &&
+             (!('rooms' in data) || data.rooms is list) &&
+             (!('endsAt' in data) || data.endsAt is number) &&
+             (!('broadcastMessage' in data) || (data.broadcastMessage is string && data.broadcastMessage.size() <= 500));
+    }
+
+    // Validation for WhiteboardSession entity
+    function isValidWhiteboard(data) {
+      return data.keys().hasAll(['roomCode', 'updatedAt']) &&
+             data.keys().hasOnly(['roomCode', 'strokes', 'lastModifiedBy', 'updatedAt']) &&
+             data.roomCode is string && data.roomCode.size() <= 64 &&
+             (!('strokes' in data) || data.strokes is list) &&
+             (!('lastModifiedBy' in data) || (data.lastModifiedBy is string && data.lastModifiedBy.size() <= 128));
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && incoming().uid == existing().uid;
+      allow delete: if false;
+    }
+
+    // Meetings Collection
+    match /meetings/{meetingId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(meetingId) && isValidMeeting(incoming()) && incoming().hostId == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(meetingId) && isValidMeeting(incoming()) && existing().hostId == request.auth.uid;
+      allow delete: if false;
+
+      // Breakouts Subcollection
+      match /breakouts/{breakoutId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && isValidId(breakoutId) && isValidBreakout(incoming()) && incoming().hostId == request.auth.uid;
+        allow update: if isSignedIn() && isValidId(breakoutId) && isValidBreakout(incoming()) && existing().hostId == request.auth.uid;
+        allow delete: if false;
+      }
+
+      // Whiteboard Subcollection
+      match /whiteboard/{whiteboardId} {
+        allow get, list: if isSignedIn();
+        allow create, update: if isSignedIn() && isValidId(whiteboardId) && isValidWhiteboard(incoming());
+        allow delete: if isSignedIn() && isValidId(whiteboardId);
+      }
+    }
+  }
+}

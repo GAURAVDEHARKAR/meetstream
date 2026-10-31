@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with Google Auth details",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 1024 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Meeting": {
+      "title": "Meeting",
+      "description": "Meeting session metadata",
+      "type": "object",
+      "properties": {
+        "roomCode": { "type": "string", "maxLength": 64 },
+        "hostId": { "type": "string", "maxLength": 128 },
+        "hostName": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["active", "ended"], "maxLength": 32 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["roomCode", "hostId", "status", "createdAt"]
+    },
+    "BreakoutSession": {
+      "title": "BreakoutSession",
+      "description": "Active breakout rooms configuration for a meeting",
+      "type": "object",
+      "properties": {
+        "mainRoomCode": { "type": "string", "maxLength": 64 },
+        "hostId": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["active", "closing", "ended"], "maxLength": 32 },
+        "rooms": { "type": "array" },
+        "endsAt": { "type": "number" },
+        "broadcastMessage": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["mainRoomCode", "hostId", "status", "createdAt"]
+    },
+    "WhiteboardSession": {
+      "title": "WhiteboardSession",
+      "description": "Whiteboard drawing strokes and state for a meeting",
+      "type": "object",
+      "properties": {
+        "roomCode": { "type": "string", "maxLength": 64 },
+        "strokes": { "type": "array" },
+        "lastModifiedBy": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["roomCode", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents indexed by user id"
+    },
+    "/meetings/{meetingId}": {
+      "schema": "Meeting",
+      "description": "Meeting document tracking meeting sessions"
+    },
+    "/meetings/{meetingId}/breakouts/{breakoutId}": {
+      "schema": "BreakoutSession",
+      "description": "Breakout room sessions within a meeting"
+    },
+    "/meetings/{meetingId}/whiteboard/{whiteboardId}": {
+      "schema": "WhiteboardSession",
+      "description": "Whiteboard session drawing state for a meeting"
+    }
+  }
+}
